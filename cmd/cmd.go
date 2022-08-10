@@ -8,11 +8,9 @@ import (
 )
 
 func main() {
-	cfgPath := ""
+	cfgPath := "/root/.kube/config"
 	if home := homedir.HomeDir(); home != "" {
 		cfgPath = filepath.Join(home, ".kube", "config")
-	} else {
-		cfgPath = "/root/.kube/config"
 	}
 
 	cli, err := exec.NewClient(cfgPath)
