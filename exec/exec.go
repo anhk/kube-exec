@@ -25,6 +25,7 @@ import (
 
 	"github.com/anhk/exec/interrupt"
 	"github.com/anhk/exec/podcmd"
+	"github.com/anhk/exec/scheme"
 	"github.com/anhk/exec/term"
 	dockerterm "github.com/moby/term"
 	corev1 "k8s.io/api/core/v1"
@@ -34,46 +35,7 @@ import (
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubectl/pkg/scheme"
 )
-
-const (
-	defaultPodExecTimeout = 60 * time.Second
-)
-
-//func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-//	options := &ExecOptions{
-//		StreamOptions: StreamOptions{
-//			IOStreams: streams,
-//		},
-//
-//		Executor: &DefaultRemoteExecutor{},
-//	}
-//	cmd := &cobra.Command{
-//		Use:                   "exec (POD | TYPE/NAME) [-c CONTAINER] [flags] -- COMMAND [args...]",
-//		DisableFlagsInUseLine: true,
-//		Short:                 i18n.T("Execute a command in a container"),
-//		Long:                  i18n.T("Execute a command in a container."),
-//		Example:               execExample,
-//		ValidArgsFunction:     completion.PodResourceNameCompletionFunc(f),
-//		Run: func(cmd *cobra.Command, args []string) {
-//			argsLenAtDash := cmd.ArgsLenAtDash()
-//			cmdutil.CheckErr(options.Complete(f, cmd, args, argsLenAtDash))
-//			cmdutil.CheckErr(options.Validate())
-//			cmdutil.CheckErr(options.Run())
-//		},
-//	}
-//	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodExecTimeout)
-//	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &options.FilenameOptions.Filenames, "to use to exec into the resource")
-//	// TODO support UID
-//	cmdutil.AddContainerVarFlags(cmd, &options.ContainerName, options.ContainerName)
-//	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc("container", completion.ContainerCompletionFunc(f)))
-//
-//	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
-//	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
-//	cmd.Flags().BoolVarP(&options.Quiet, "quiet", "q", options.Quiet, "Only print output from the remote session")
-//	return cmd
-//}
 
 // RemoteExecutor defines the interface accepted by the Exec command - provided for test stubbing
 type RemoteExecutor interface {
@@ -134,72 +96,6 @@ type ExecOptions struct {
 	Config        *restclient.Config
 }
 
-// Complete verifies command line arguments and loads data from the command environment
-//func (p *ExecOptions) Complete() error {
-//	if len(argsIn) > 0 && argsLenAtDash != 0 {
-//		p.ResourceName = argsIn[0]
-//	}
-//	if argsLenAtDash > -1 {
-//		p.Command = argsIn[argsLenAtDash:]
-//	} else if len(argsIn) > 1 {
-//		if !p.Quiet {
-//			fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
-//		}
-//		p.Command = argsIn[1:]
-//	} else if len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0 {
-//		if !p.Quiet {
-//			fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
-//		}
-//		p.Command = argsIn[0:]
-//		p.ResourceName = ""
-//	}
-//
-//var err error
-//	p.Namespace, p.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-//	if err != nil {
-//		return err
-//	}
-//
-//	p.ExecutablePodFn = polymorphichelpers.AttachablePodForObjectFn
-//
-//	p.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
-//	if err != nil {
-//		return cmdutil.UsageErrorf(cmd, err.Error())
-//	}
-//
-//	p.Builder = f.NewBuilder
-//	p.restClientGetter = f
-//
-//p.Config, err = f.ToRESTConfig()
-//if err != nil {
-//	return err
-//}
-//return nil
-////
-////	clientset, err := f.KubernetesClientSet()
-////	if err != nil {
-////		return err
-////	}
-////	p.PodClient = clientset.CoreV1()
-////
-////	return nil
-//}
-
-//
-//// Validate checks that the provided exec options are specified.
-//func (p *ExecOptions) Validate() error {
-//	if len(p.PodName) == 0 && len(p.ResourceName) == 0 && len(p.FilenameOptions.Filenames) == 0 {
-//		return fmt.Errorf("pod, type/name or --filename must be specified")
-//	}
-//	if len(p.Command) == 0 {
-//		return fmt.Errorf("you must specify at least one command for the container")
-//	}
-//	if p.Out == nil || p.ErrOut == nil {
-//		return fmt.Errorf("both output and error output must be provided")
-//	}
-//	return nil
-//}
-
 func (o *StreamOptions) SetupTTY() term.TTY {
 	t := term.TTY{
 		Parent: o.InterruptParent,
@@ -218,20 +114,20 @@ func (o *StreamOptions) SetupTTY() term.TTY {
 		return t
 	}
 
-	//if o.isTerminalIn == nil {
-	//	o.isTerminalIn = func(tty term.TTY) bool {
-	//		return tty.IsTerminalIn()
-	//	}
-	//}
-	//if !o.isTerminalIn(t) {
-	//	o.TTY = false
-	//
-	//	if !o.Quiet && o.ErrOut != nil {
-	//		fmt.Fprintln(o.ErrOut, "Unable to use a TTY - input is not a terminal or the right kind of file")
-	//	}
-	//
-	//	return t
-	//}
+	if o.isTerminalIn == nil {
+		o.isTerminalIn = func(tty term.TTY) bool {
+			return tty.IsTerminalIn()
+		}
+	}
+	if !o.isTerminalIn(t) {
+		o.TTY = false
+
+		if !o.Quiet && o.ErrOut != nil {
+			fmt.Fprintln(o.ErrOut, "Unable to use a TTY - input is not a terminal or the right kind of file")
+		}
+
+		return t
+	}
 
 	// if we get to here, the user wants to attach stdin, wants a TTY, and o.In is a terminal, so we
 	// can safely set t.Raw to true

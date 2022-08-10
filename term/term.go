@@ -17,7 +17,6 @@ limitations under the License.
 package term
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"runtime"
@@ -68,8 +67,6 @@ func (t TTY) IsTerminalOut() bool {
 // IsTerminal returns whether the passed object is a terminal or not
 func IsTerminal(i interface{}) bool {
 	_, terminal := term.GetFdInfo(i)
-	fmt.Println("terminal: ", terminal)
-	fmt.Printf("i: %T %+v\n", i, i)
 	return terminal
 }
 

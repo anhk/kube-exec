@@ -4,12 +4,12 @@ import (
 	"os"
 
 	"github.com/anhk/exec/exec"
+	"github.com/anhk/exec/scheme"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubectl/pkg/scheme"
 )
 
 type Shell struct {
@@ -32,7 +32,7 @@ func NewClient(cfgPath string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	//cfg.TLSClientConfig.ServerName = "192.168.49.2" // for test <minikube>
+	cfg.TLSClientConfig.ServerName = "192.168.49.2" // for test <minikube>
 	cfg.GroupVersion = &corev1.SchemeGroupVersion
 	cfg.NegotiatedSerializer = scheme.Codecs
 	cfg.APIPath = "/api"
