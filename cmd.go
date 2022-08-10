@@ -32,7 +32,7 @@ func NewClient(cfgPath string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.TLSClientConfig.ServerName = "192.168.49.2" // for test <minikube>
+	//cfg.TLSClientConfig.ServerName = "192.168.49.2" // for test <minikube>
 	cfg.GroupVersion = &corev1.SchemeGroupVersion
 	cfg.NegotiatedSerializer = scheme.Codecs
 	cfg.APIPath = "/api"
