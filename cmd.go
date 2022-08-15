@@ -1,7 +1,11 @@
 package exec
 
 import (
+	"bytes"
+	"io"
 	"os"
+
+	"github.com/anhk/exec/cp"
 
 	"github.com/anhk/exec/exec"
 	"github.com/anhk/exec/scheme"
@@ -11,6 +15,15 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+type File struct {
+	client *kubernetes.Clientset
+	config *restclient.Config
+
+	Namespace string
+	PodName   string
+	Filename  string
+}
 
 type Shell struct {
 	client *kubernetes.Clientset
@@ -32,7 +45,7 @@ func NewClient(cfgPath string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	//cfg.TLSClientConfig.ServerName = "192.168.49.2" // for test <minikube>
+	cfg.TLSClientConfig.ServerName = "192.168.49.2" // for test <minikube>
 	cfg.GroupVersion = &corev1.SchemeGroupVersion
 	cfg.NegotiatedSerializer = scheme.Codecs
 	cfg.APIPath = "/api"
@@ -42,6 +55,17 @@ func NewClient(cfgPath string) (*Client, error) {
 		return nil, err
 	}
 	return &Client{client: client, config: cfg}, nil
+}
+
+func (cli *Client) File(namespace, podName, fileName string) *File {
+	return &File{
+		client: cli.client,
+		config: cli.config,
+
+		Namespace: namespace,
+		PodName:   podName,
+		Filename:  fileName,
+	}
 }
 
 func (cli *Client) Shell(namespace, podName, command string, args ...string) *Shell {
@@ -77,4 +101,46 @@ func (s *Shell) Run() error {
 	options.Command = append(options.Command, s.Args...)
 
 	return options.Run()
+}
+
+// ReadFile 从Pod读文件
+func (f *File) ReadFile() (io.ReadCloser, error) {
+	reader, writer := io.Pipe()
+
+	options := cp.CopyOptions{
+		Namespace:    f.Namespace,
+		ClientConfig: f.config,
+		Clientset:    f.client,
+		PodName:      f.PodName,
+		FileName:     f.Filename,
+		IOStreams: genericclioptions.IOStreams{
+			In:     nil,
+			Out:    writer,
+			ErrOut: bytes.NewBuffer([]byte{}),
+		},
+	}
+	go func() {
+		defer func() { _ = writer.Close() }()
+		if err := options.CopyFromPod(); err != nil { // TODO: 错误处理
+			return
+		}
+	}()
+	return reader, nil
+}
+
+// WriteFile 向Pod写文件
+func (f *File) WriteFile(reader io.Reader) error {
+	options := cp.CopyOptions{
+		Namespace:    f.Namespace,
+		ClientConfig: f.config,
+		Clientset:    f.client,
+		PodName:      f.PodName,
+		FileName:     f.Filename,
+		IOStreams: genericclioptions.IOStreams{
+			In:     reader,
+			Out:    bytes.NewBuffer([]byte{}),
+			ErrOut: bytes.NewBuffer([]byte{}),
+		},
+	}
+	return options.CopyToPod()
 }
