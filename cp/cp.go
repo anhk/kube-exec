@@ -70,57 +70,6 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 	return o.execute(options)
 }
 
-//
-//func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) error {
-//	if _, err := os.Stat(src.File.String()); err != nil {
-//		return fmt.Errorf("%s doesn't exist in local filesystem", src.File)
-//	}
-//	reader, writer := io.Pipe()
-//
-//	srcFile := src.File.(localPath)
-//	destFile := dest.File.(remotePath)
-//
-//	if err := o.checkDestinationIsDir(dest); err == nil {
-//		// If no error, dest.File was found to be a directory.
-//		// Copy specified src into it
-//		destFile = destFile.Join(srcFile.Base())
-//	}
-//
-//	go func(src localPath, dest remotePath, writer io.WriteCloser) {
-//		defer writer.Close()
-//		//cmdutil.CheckErr(makeTar(src, dest, writer))
-//		makeTar(src, dest, writer)
-//	}(srcFile, destFile, writer)
-//	var cmdArr []string
-//
-//	// TODO: Improve error messages by first testing if 'tar' is present in the container?
-//	if o.NoPreserve {
-//		cmdArr = []string{"tar", "--no-same-permissions", "--no-same-owner", "-xmf", "-"}
-//	} else {
-//		cmdArr = []string{"tar", "-xmf", "-"}
-//	}
-//	destFileDir := destFile.Dir().String()
-//	if len(destFileDir) > 0 {
-//		cmdArr = append(cmdArr, "-C", destFileDir)
-//	}
-//
-//	options.StreamOptions = exec.StreamOptions{
-//		IOStreams: genericclioptions.IOStreams{
-//			In:     reader,
-//			Out:    o.Out,
-//			ErrOut: o.ErrOut,
-//		},
-//		Stdin: true,
-//
-//		Namespace: dest.PodNamespace,
-//		PodName:   dest.PodName,
-//	}
-//
-//	options.Command = cmdArr
-//	options.Executor = &exec.DefaultRemoteExecutor{}
-//	return o.execute(options)
-//}
-
 type TarPipe struct {
 	src       fileSpec
 	o         *CopyOptions
@@ -161,7 +110,7 @@ func (t *TarPipe) initReadFrom(n uint64) {
 	}
 
 	go func() {
-		defer t.outStream.Close()
+		defer func() { _ = t.outStream.Close() }()
 		//cmdutil.CheckErr(t.o.execute(options))
 		_ = t.o.execute(options) // TODO: 处理错误
 	}()
@@ -197,7 +146,7 @@ func makeTar(src io.Reader, dest remotePath, writer io.Writer) error {
 		ModTime:    now,
 		AccessTime: now,
 		ChangeTime: now,
-		Size:       19,
+		Size:       dest.len,
 		Typeflag:   tar.TypeReg,
 	}
 
@@ -270,7 +219,7 @@ func (o *CopyOptions) execute(options *exec.ExecOptions) error {
 }
 
 func (o *CopyOptions) CopyFromPod() error {
-	srcFile := remotePath{o.FileName}
+	srcFile := remotePath{file: o.FileName}
 	src := fileSpec{
 		PodName:      o.PodName,
 		PodNamespace: o.Namespace,
@@ -284,8 +233,8 @@ func (o *CopyOptions) CopyFromPod() error {
 	return o.untarAll(prefix, reader)
 }
 
-func (o *CopyOptions) CopyToPod() error {
-	destFile := remotePath{o.FileName}
+func (o *CopyOptions) CopyToPod(fileLen int64) error {
+	destFile := remotePath{file: o.FileName, len: fileLen}
 	dest := fileSpec{
 		PodName:      o.PodName,
 		PodNamespace: o.Namespace,

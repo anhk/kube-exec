@@ -104,9 +104,7 @@ func (s *Shell) Run() error {
 }
 
 // ReadFile 从Pod读文件
-func (f *File) ReadFile() (io.ReadCloser, error) {
-	reader, writer := io.Pipe()
-
+func (f *File) ReadFileToWriter(writer io.WriteCloser) error {
 	options := cp.CopyOptions{
 		Namespace:    f.Namespace,
 		ClientConfig: f.config,
@@ -119,17 +117,11 @@ func (f *File) ReadFile() (io.ReadCloser, error) {
 			ErrOut: bytes.NewBuffer([]byte{}),
 		},
 	}
-	go func() {
-		defer func() { _ = writer.Close() }()
-		if err := options.CopyFromPod(); err != nil { // TODO: 错误处理
-			return
-		}
-	}()
-	return reader, nil
+	return options.CopyFromPod()
 }
 
 // WriteFile 向Pod写文件
-func (f *File) WriteFile(reader io.Reader) error {
+func (f *File) WriteFileFromReader(reader io.Reader, len int64) error {
 	options := cp.CopyOptions{
 		Namespace:    f.Namespace,
 		ClientConfig: f.config,
@@ -142,5 +134,5 @@ func (f *File) WriteFile(reader io.Reader) error {
 			ErrOut: bytes.NewBuffer([]byte{}),
 		},
 	}
-	return options.CopyToPod()
+	return options.CopyToPod(len)
 }

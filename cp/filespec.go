@@ -72,18 +72,11 @@ func (p localPath) StripSlashes() localPath {
 	return newLocalPath(stripLeadingSlash(p.file))
 }
 
-func isRelative(base, target localPath) bool {
-	relative, err := filepath.Rel(base.String(), target.String())
-	if err != nil {
-		return false
-	}
-	return relative == "." || relative == stripPathShortcuts(relative)
-}
-
 // remotePath represents always UNIX path, its methods will use path
 // package which is always using `/`
 type remotePath struct {
 	file string
+	len  int64
 }
 
 func newRemotePath(fileName string) remotePath {
